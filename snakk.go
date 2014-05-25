@@ -79,12 +79,17 @@ func (all *users) All() []user {
 
 var (
 	usersOnline = &users{users: make(map[string]int)}
+	chatHistory *FIFO
 	nextID      int
 	h           chatHub
 	cfg         *Config
 	l           log.Logger
-	templates   = template.Must(template.ParseFiles("data/page.html"))
-	commands    = []command{
+	funcMap     = template.FuncMap{
+		"timeFormat": func(t time.Time) string {
+			return t.Format("15:04")
+		}}
+	templates = template.Must(template.New("").Funcs(funcMap).ParseFiles("data/page.html"))
+	commands  = []command{
 		{Cmd: "nick", Desc: "'/nick <nickname>', sets your nicname."},
 		{Cmd: "help", Desc: "'/help', shows the list of commands. '/help <command>', shows command usage."},
 		{Cmd: "me", Desc: "'/me <action>', sends action to the chatroom (actions are written in 3rd person)."},
@@ -118,11 +123,13 @@ func loadConfig(filename string) (*Config, error) {
 
 func chatRoomHandler(w http.ResponseWriter, r *http.Request) {
 	data := struct {
-		Host  string
-		Users []user
+		Host    string
+		Users   []user
+		History []chatLine
 	}{
-		Host:  r.Host,
-		Users: usersOnline.All(),
+		Host:    r.Host,
+		Users:   usersOnline.All(),
+		History: chatHistory.All(),
 	}
 	err := templates.ExecuteTemplate(w, "page.html", data)
 	if err != nil {
@@ -256,6 +263,7 @@ func (h chatHub) run() {
 				Message:  fmt.Sprintf("%s has left the chat", nick)}
 			h.broadcast <- msg
 		case msg := <-h.broadcast:
+			msg.TimeStamp = time.Now()
 			for c := range h.connections {
 				select {
 				case c.send <- msg:
@@ -264,6 +272,9 @@ func (h chatHub) run() {
 					usersOnline.Remove(c.user)
 					delete(h.connections, c)
 				}
+			}
+			if !msg.Meta {
+				chatHistory.Push(msg)
 			}
 		case um := <-h.incoming:
 			m := bytes.TrimSpace(um.msg)
@@ -377,7 +388,8 @@ func main() {
 	}
 
 	l = log.New()
-	//chatHistory := newFIFO(cfg.ChatHistoryNumLines)
+
+	chatHistory = newFIFO(cfg.ChatHistoryNumLines)
 
 	h = newChatHub()
 	go h.run()
