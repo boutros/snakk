@@ -83,7 +83,7 @@ var (
 	nextID      int
 	h           chatHub
 	cfg         *Config
-	l           log.Logger
+	l           = log.New()
 	funcMap     = template.FuncMap{
 		"timeFormat": func(t time.Time) string {
 			return t.Format("15:04")
@@ -387,7 +387,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	l = log.New()
+	level, err := log.LvlFromString(cfg.LogLevel)
+	if err != nil {
+		level = log.LvlInfo
+	}
+
+	l.SetHandler(log.MultiHandler(
+		log.LvlFilterHandler(level, log.Must.FileHandler(cfg.LogFile, log.LogfmtFormat())),
+		log.StreamHandler(os.Stdout, log.TerminalFormat())))
 
 	chatHistory = newFIFO(cfg.ChatHistoryNumLines)
 
