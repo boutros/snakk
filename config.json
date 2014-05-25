@@ -1,0 +1,9 @@
+{
+  "ServePort": 9999,
+  "LogLevel": "info",
+  "Logfile": "/usr/share/snakk/server.log",
+  "ChatHistoryNumLines": 100,
+  "UseBasicAuth": false,
+  "BasicAuthUsername": "frisk",
+  "BasicAuthPassword": "fisk"
+}

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset=utf-8 />
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>snakk!</title>
+		<style>
+			html { height: 100%; overflow: hidden; }
+			* { font-family: monospace; font-size: 13px;}
+			body { margin: 0; padding: 0; }
+			ul { list-style: none; padding: 4px; margin: 0}
+			#container { width: 100%}
+			#chatRoom { position: absolute; top: 0; bottom: 24px; left: 0; right: 154px; overflow-y: scroll; border-bottom: 1px solid #aaa; border-right: 1px solid #aaa; word-wrap: break-word;}
+			#usersBar { position: absolute; top: 0; right: 4px; bottom: 24px; width: 148px; border: 1px solid #ccc; background: #eee}
+			#inputBar { position: absolute; bottom: 0px; border: 0px; width: 100%; height:20px; padding-left: 6px; }
+			#userList { font-weight: bold; }
+			#userList li { margin: 4px; padding: 2px}
+			.timeStamp { min-width: 80px;}
+			.agent { display: inline-block; width: 80px; text-align: right; padding:0 6px; right; border-right: 1px solid  #ccc;}
+			.message { margin-left:6px; }
+			.grey { color: #666 }
+			.green { color: green }
+			.red { color: #b00 }
+		</style>
+	</head>
+
+	<body>
+		<div id="container">
+			<div id="chatRoom">
+				<ul id="chatLines"></ul>
+			</div>
+			<div id="usersBar">
+				<ul id="userList">
+					{{range .Users}}
+						<li id="user-{{.ID}}">{{.Nick}}</li>
+					{{end}}
+				</ul>
+			</div>
+			<input type="text" placeholder="say something" id="inputBar" />
+		</div>
+		<script>
+			var hist = [""];
+			var i = hist.length - 1;
+			var ws;
+
+			var joined = /has joined the chat/;
+			var newName = /is now known as/;
+
+			function parseTime(s) {
+				//2014-05-25T09:25:28.192473475+02:00
+				return s.slice(11, 16);
+			}
+
+			function linkify(text) {
+				if (text) {
+					text = text.replace(
+						/((https?\:\/\/)|(www\.))(\S+)(\w{2,4})(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/gi,
+						function(url){
+							var full_url = url;
+							if (!full_url.match('^https?:\/\/')) {
+								full_url = 'http://' + full_url;
+							}
+						return '<a target="_blank" href="' + full_url + '">' + url + '</a>';
+						}
+					);
+					}
+				return text;
+			}
+
+			function keyup(e) {
+				e = e || window.event;
+				key = e.keyCode || e.wich || e.charCode;
+
+				var v = this.value;
+				var c = true; // ?
+
+				switch(key) {
+					case 13: // post message to chat room
+						if (v) {
+							i = hist.length -1;
+							hist[i++] = v;
+							hist[i] = "";
+							ws.send(v);
+						}
+					case 27: // clear input field
+						this.value = "";
+					default: // just typing
+						c = false;
+						break;
+					case 38: // up, back in history
+						if (i) {
+							i--;
+						}
+						break
+					case 40: // down, forward in history
+						if (i < hist.length - 1) {
+							i++;
+							break
+						}
+				}
+
+				if(c) this.value = hist[i];
+
+			}
+
+			document.addEventListener('DOMContentLoaded', function(){
+				var lines = document.getElementById("chatLines");
+				var chatRoom = document.getElementById("chatRoom");
+				var userList = document.getElementById("userList");
+				chatRoom.scrollTop = chatRoom.scrollHeight;
+
+				// focus on input field
+				var input = document.getElementById("inputBar");
+				input.focus();
+				input.value = "/nick ";
+
+				// listen for messages
+				input.addEventListener("keyup", keyup, false);
+
+				// connect & handle ws messages
+				ws = new WebSocket("ws://{{.Host}}/ws");
+				ws.onopen = function(e) {
+					console.log("ws connected");
+				}
+				ws.onclose = function(e) {
+					var li = document.createElement("li");
+					if (li.classList) {
+						li.classList.add("red");
+					} else {
+						li.className += " red";
+					}
+					li.innerHTML = "ERROR: Server unavailable. Refresh page to retry";
+					lines.appendChild(li);
+					chatRoom.scrollTop = chatRoom.scrollHeight;
+					input.setAttribute("disabled", true);
+
+				}
+				ws.onerror = function(e) {
+					console.log("ws error: " + e.data);
+				}
+				ws.onmessage = function(e) {
+					console.log(e.data);
+					var line = JSON.parse(e.data);
+					var li = document.createElement("li");
+					if (line.Color != "") {
+						if (li.classList) {
+						li.classList.add(line.Color);
+					} else {
+						li.className += ' ' + line.Color;
+					}
+
+					}
+					var c = "<span class='timeStamp'>[" + parseTime(line.TimeStamp) + "]</span>" +
+													 "<span class='agent'>" + line.Author + "</span>" +
+													 "<span class='message'>" + linkify(line.Message) + "</span>";
+					li.innerHTML = c;
+					lines.appendChild(li);
+					// scroll to bottom
+					chatRoom.scrollTop = chatRoom.scrollHeight;
+
+					if (line.UserNew) {
+						var li = document.createElement("li");
+						li.setAttribute("id", "user-"+line.UserNew);
+						li.innerHTML = line.UserNick;
+						userList.appendChild(li);
+					}
+
+					if (line.UserChange) {
+						var old = document.getElementById("user-"+line.UserChange);
+						if ( old) {
+							userList.removeChild(old);
+						}
+						var li = document.createElement("li");
+						li.setAttribute("id", "user-"+line.UserChange);
+						li.innerHTML = line.UserNick;
+						userList.appendChild(li);
+					}
+
+					if (line.UserLeft) {
+						var old = document.getElementById("user-"+line.UserLeft);
+						if ( old) {
+							userList.removeChild(old);
+						}
+					}
+				}
+			});
+		</script>
+	</body>
+</html>
