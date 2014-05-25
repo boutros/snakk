@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"os/signal"
 	"time"
 	"unicode"
 
@@ -386,6 +387,20 @@ func main() {
 		log.Error("failed to load config file", log.Ctx{"cause": err.Error()})
 		os.Exit(1)
 	}
+
+	// trap ^C
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		<-c
+		h.broadcast <- chatLine{
+			Color:   "red",
+			Author:  "*",
+			Meta:    true,
+			Message: "Server is shutting down, sorry!"}
+		l.Info("recieved interuption signal; shutting down server")
+		os.Exit(0)
+	}()
 
 	level, err := log.LvlFromString(cfg.LogLevel)
 	if err != nil {
