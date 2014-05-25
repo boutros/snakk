@@ -1,4 +1,4 @@
 *.out
 *.deb
-deb/snakk/usr
-snakk
+/deb/snakk/usr
+/snakk

@@ -1,0 +1,8 @@
+Package: snakk
+Version: 0.2
+Section: base
+Priority: optional
+Architecture: amd64
+Depends:
+Maintainer: Petter Goksøyr Åsen <boutrosboutrosboutros@gmail.com>
+Description: Chat-server with irc-like browser frontend
