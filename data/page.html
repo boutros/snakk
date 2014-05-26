@@ -168,7 +168,6 @@
 					console.log("ws error: " + e.data);
 				}
 				ws.onmessage = function(e) {
-					console.log(e.data);
 					var line = JSON.parse(e.data);
 					var li = document.createElement("li");
 					if (line.Color != "") {
