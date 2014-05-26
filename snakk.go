@@ -48,6 +48,7 @@ var (
 	nextID      int
 	h           chatHub
 	cfg         *Config
+	status      = registerMetrics()
 	l           = log.New()
 	funcMap     = template.FuncMap{
 		"timeFormat": func(t time.Time) string {
@@ -111,6 +112,15 @@ func usersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(b)
+}
+
+func statusHandler(w http.ResponseWriter, r *http.Request) {
+	b, err := json.Marshal(status.Export())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(b)
 }
@@ -342,7 +352,11 @@ func (h chatHub) run() {
 						Meta:    true,
 						Message: "Your nickname cannot be empty."}
 				case "uptime":
-					println("display uptime")
+					um.c.send <- chatLine{
+						Color:   "green",
+						Author:  "**",
+						Meta:    true,
+						Message: fmt.Sprintf("The server has been running for %s.", status.Export().UpTime)}
 				case "me":
 					msg := chatLine{
 						Color:   "green",
@@ -441,6 +455,7 @@ func main() {
 	http.HandleFunc("/", chatRoomHandler)
 	http.HandleFunc("/users", usersHandler)
 	http.HandleFunc("/ws", wsHandler)
+	http.HandleFunc("/.status", statusHandler)
 	http.HandleFunc("/favicon.ico", serveFile("data/irc.ico"))
 	http.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("User-agent: *\nDisallow: /"))
