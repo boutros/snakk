@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"sync"
 	"os/signal"
 	"time"
 	"unicode"
@@ -44,42 +43,7 @@ type userMsg struct {
 	c   *conn
 }
 
-type users struct {
-	users map[string]int
-	sync.RWMutex
-}
-
-func (all *users) Add(u *user) {
-	all.Lock()
-	defer all.Unlock()
-	all.users[u.Nick] = u.ID
-}
-
-func (all *users) Remove(u *user) {
-	all.Lock()
-	defer all.Unlock()
-	delete(all.users, u.Nick)
-}
-
-func (all *users) Get(nick string) bool {
-	all.RLock()
-	defer all.RUnlock()
-	_, ok := all.users[nick]
-	return ok
-}
-
-func (all *users) All() []user {
-	r := make([]user, 0)
-	all.RLock()
-	defer all.RUnlock()
-	for k, v := range all.users {
-		r = append(r, user{Nick: k, ID: v})
-	}
-	return r
-}
-
 var (
-	usersOnline = &users{users: make(map[string]int)}
 	chatHistory *FIFO
 	nextID      int
 	h           chatHub
@@ -129,13 +93,26 @@ func chatRoomHandler(w http.ResponseWriter, r *http.Request) {
 		History []chatLine
 	}{
 		Host:    r.Host,
-		Users:   usersOnline.All(),
 		History: chatHistory.All(),
 	}
 	err := templates.ExecuteTemplate(w, "page.html", data)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func usersHandler(w http.ResponseWriter, r *http.Request) {
+	h.sendUsers <- true
+	users := <-h.getUsers
+
+	b, err := json.Marshal(users)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(b)
 }
 
 func serveFile(filename string) func(w http.ResponseWriter, r *http.Request) {
@@ -204,6 +181,8 @@ type chatHub struct {
 	broadcast   chan chatLine
 	register    chan *conn
 	unregister  chan *conn
+	sendUsers   chan bool
+	getUsers    chan []user
 }
 
 func newChatHub() chatHub {
@@ -213,6 +192,8 @@ func newChatHub() chatHub {
 		register:    make(chan *conn),
 		unregister:  make(chan *conn),
 		connections: make(map[*conn]bool),
+		sendUsers:   make(chan bool),
+		getUsers:    make(chan []user),
 	}
 }
 
@@ -234,6 +215,14 @@ func cleanNick(s string) string {
 func (h chatHub) run() {
 	for {
 		select {
+		case <-h.sendUsers:
+			users := []user{}
+			for c := range h.connections {
+				if c.user.Nick != "" {
+					users = append(users, *c.user)
+				}
+			}
+			h.getUsers <- users
 		case c := <-h.register:
 			h.connections[c] = true
 			nextID = nextID + 1
@@ -250,19 +239,20 @@ func (h chatHub) run() {
 				Meta:    true,
 				Message: "Enter your nickname to join the chat."}
 		case c := <-h.unregister:
-			usersOnline.Remove(c.user)
 			l.Info("client disconnected", log.Ctx{"address": c.ws.RemoteAddr().String()})
 			nick := c.user.Nick
 			id := c.user.ID
 			delete(h.connections, c)
 			close(c.send)
-			msg := chatLine{
-				Color:    "green",
-				Meta:     true,
-				Author:   "*",
-				UserLeft: id,
-				Message:  fmt.Sprintf("%s has left the chat", nick)}
-			h.broadcast <- msg
+			if nick != "" {
+				msg := chatLine{
+					Color:    "green",
+					Meta:     true,
+					Author:   "*",
+					UserLeft: id,
+					Message:  fmt.Sprintf("%s has left the chat", nick)}
+				h.broadcast <- msg
+			}
 		case msg := <-h.broadcast:
 			msg.TimeStamp = time.Now()
 			for c := range h.connections {
@@ -270,7 +260,6 @@ func (h chatHub) run() {
 				case c.send <- msg:
 				default:
 					close(c.send)
-					usersOnline.Remove(c.user)
 					delete(h.connections, c)
 				}
 			}
@@ -298,7 +287,14 @@ func (h chatHub) run() {
 				case "nick":
 					if len(rest) > 0 {
 						nick := cleanNick(string(rest))
-						if usersOnline.Get(nick) && um.c.user.Nick != nick {
+						nickTaken := false
+						for c := range h.connections {
+							if c.user.Nick == nick {
+								nickTaken = true
+								break
+							}
+						}
+						if nickTaken && um.c.user.Nick != nick {
 							um.c.send <- chatLine{
 								Color:   "red",
 								Author:  "**",
@@ -320,14 +316,13 @@ func (h chatHub) run() {
 							Author:   "*",
 							Meta:     true,
 							UserNick: um.c.user.Nick}
-						if usersOnline.Get(oldNick) {
+						if oldNick != "" {
 							msg.UserChange = um.c.user.ID
 							msg.Message = fmt.Sprintf("%s is now known as %s", oldNick, nick)
 						} else {
 							msg.UserNew = um.c.user.ID
 							msg.Message = fmt.Sprintf("%s has joined the chat", nick)
 						}
-						usersOnline.Add(um.c.user)
 						for c := range h.connections {
 							if c == um.c {
 								continue
@@ -336,7 +331,6 @@ func (h chatHub) run() {
 							case c.send <- msg:
 							default:
 								close(c.send)
-								usersOnline.Remove(c.user)
 								delete(h.connections, c)
 							}
 						}
@@ -418,6 +412,7 @@ func main() {
 
 	// routing
 	http.HandleFunc("/", chatRoomHandler)
+	http.HandleFunc("/users", usersHandler)
 	http.HandleFunc("/ws", wsHandler)
 	http.HandleFunc("/favicon.ico", serveFile("data/irc.ico"))
 	http.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {

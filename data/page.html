@@ -39,9 +39,6 @@
 			</div>
 			<div id="usersBar">
 				<ul id="userList">
-					{{range .Users}}
-						<li id="user-{{.ID}}">{{.Nick}}</li>
-					{{end}}
 				</ul>
 			</div>
 			<input type="text" placeholder="say something" id="inputBar" />
@@ -112,10 +109,34 @@
 			}
 
 			document.addEventListener('DOMContentLoaded', function(){
+				// variables
 				var lines = document.getElementById("chatLines");
 				var chatRoom = document.getElementById("chatRoom");
 				var userList = document.getElementById("userList");
 				chatRoom.scrollTop = chatRoom.scrollHeight;
+
+				// fetch users
+				req = new XMLHttpRequest();
+				req.open('GET','/users', true);
+				req.onload = function() {
+					if (req.status >= 200 && req.status < 400) {
+						data = JSON.parse(req.responseText);
+						Array.prototype.forEach.call(data, function(el, i) {
+							var li = document.createElement("li");
+							li.setAttribute("id", "user-"+el.ID);
+							li.innerHTML = el.Nick;
+							userList.appendChild(li);
+						});
+					} else {
+						console.log("error fetching user list");
+					}
+				};
+
+				req.onerror = function() {
+					console.log("failed to fetch user list");
+				};
+
+				req.send();
 
 				// focus on input field
 				var input = document.getElementById("inputBar");
