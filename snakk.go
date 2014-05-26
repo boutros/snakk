@@ -56,7 +56,7 @@ var (
 		}}
 	templates = template.Must(template.New("").Funcs(funcMap).ParseFiles("data/page.html"))
 	commands  = []command{
-		{Cmd: "nick", Desc: "'/nick <nickname>', sets your nicname."},
+		{Cmd: "nick", Desc: "'/nick <nickname>', sets your nickname."},
 		{Cmd: "help", Desc: "'/help', shows the list of commands. '/help <command>', shows command usage."},
 		{Cmd: "me", Desc: "'/me <action>', sends action to the chatroom (actions are written in 3rd person)."},
 		{Cmd: "uptime", Desc: "'/uptime', displays how long server has been running."}}
@@ -290,7 +290,7 @@ func (h chatHub) run() {
 						Color:   "red",
 						Author:  "**",
 						Meta:    true,
-						Message: "You must choose a nicname before you can join the chat."}
+						Message: "You must choose a nickname before you can join the chat."}
 					break
 				}
 				switch string(cmd) {
