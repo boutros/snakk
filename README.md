@@ -2,11 +2,11 @@
 
 Chat-server with an IRC-like web frontend.
 
-### Install
+### Install (Ubuntu/Debian)
 
 ```bash
-wget https://github.com/boutros/snakk/releases/download/v0.2/snakk_v0.2.deb
-sudo dpkg -i snakk_v0.2.deb
+wget https://github.com/boutros/snakk/releases/download/v0.3/snakk_v0.3.deb
+sudo dpkg -i snakk_v0.3.deb
 sudo service snakk start
 ```
 
