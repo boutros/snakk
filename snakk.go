@@ -351,7 +351,34 @@ func (h chatHub) run() {
 						Message: fmt.Sprintf("%s %s", um.c.user.Nick, string(rest))}
 					h.broadcast <- msg
 				case "help":
-					println("help")
+					if len(bytes.TrimSpace(rest)) == 0 {
+						um.c.send <- chatLine{
+							Color:   "green",
+							Author:  "**",
+							Meta:    true,
+							Message: "Available commands: nick, me, help, uptime. Type /help &lt;command&gt; for usage information."}
+						break
+					}
+					cleanedCmd := string(bytes.TrimSpace(rest))
+					validCmd := false
+					for _, c := range commands {
+						if cleanedCmd == c.Cmd {
+							um.c.send <- chatLine{
+								Color:   "green",
+								Author:  "**",
+								Meta:    true,
+								Message: c.Desc}
+							validCmd = true
+							break
+						}
+					}
+					if !validCmd {
+						um.c.send <- chatLine{
+							Color:   "red",
+							Author:  "**",
+							Meta:    true,
+							Message: "Unknown command."}
+					}
 				default:
 					um.c.send <- chatLine{
 						Color:   "red",
