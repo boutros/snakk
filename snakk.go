@@ -56,9 +56,9 @@ var (
 		}}
 	templates = template.Must(template.New("").Funcs(funcMap).ParseFiles("data/page.html"))
 	commands  = []command{
-		{Cmd: "nick", Desc: "'/nick <nickname>', sets your nickname."},
-		{Cmd: "help", Desc: "'/help', shows the list of commands. '/help <command>', shows command usage."},
-		{Cmd: "me", Desc: "'/me <action>', sends action to the chatroom (actions are written in 3rd person)."},
+		{Cmd: "nick", Desc: "'/nick &lt;nickname&gt;', sets your nickname."},
+		{Cmd: "help", Desc: "'/help', shows the list of commands. '/help &lt;command&gt;', shows command usage."},
+		{Cmd: "me", Desc: "'/me &lt;action&gt;', sends action to the chatroom (actions are written in 3rd person)."},
 		{Cmd: "uptime", Desc: "'/uptime', displays how long server has been running."}}
 )
 
