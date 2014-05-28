@@ -5,7 +5,7 @@ Chat-server with an IRC-like web frontend.
 ### Install (Ubuntu/Debian)
 
 ```bash
-wget https://github.com/boutros/snakk/releases/download/v0.3/snakk_v0.3.deb
+wget https://github.com/boutros/snakk/releases/download/v0.4/snakk_v0.4.deb
 sudo dpkg -i snakk_v0.3.deb
 sudo service snakk start
 ```
