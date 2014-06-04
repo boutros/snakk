@@ -9,11 +9,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"time"
 	"unicode"
 
 	"github.com/gorilla/websocket"
-	log "github.com/inconshreveable/log15"
+	log "gopkg.in/inconshreveable/log15.v2"
 )
 
 type user struct {
@@ -416,6 +417,18 @@ func (h chatHub) run() {
 	}
 }
 
+// investigate crashes, possibly due to mod_proxy_wstunnel bug
+func panicRecover(f func(w http.ResponseWriter, r *http.Request)) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				l.Error("recovering from panic", log.Ctx{"error": err, "stack": string(debug.Stack())})
+			}
+		}()
+		f(w, r)
+	}
+}
+
 func main() {
 	cfg, err := loadConfig("config.json")
 	if err != nil {
@@ -454,7 +467,7 @@ func main() {
 	// routing
 	http.HandleFunc("/", chatRoomHandler)
 	http.HandleFunc("/users", usersHandler)
-	http.HandleFunc("/ws", wsHandler)
+	http.HandleFunc("/ws", panicRecover(wsHandler))
 	http.HandleFunc("/.status", statusHandler)
 	http.HandleFunc("/favicon.ico", serveFile("data/irc.ico"))
 	http.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
@@ -462,5 +475,8 @@ func main() {
 	})
 
 	l.Info("starting chat server")
-	http.ListenAndServe(fmt.Sprintf(":%d", cfg.ServePort), nil)
+	err = http.ListenAndServe(fmt.Sprintf(":%d", cfg.ServePort), nil)
+	if err != nil {
+		l.Error("http server crashed", log.Ctx{"cause": err.Error()})
+	}
 }
