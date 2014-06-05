@@ -15,9 +15,12 @@
 			#inputBar { position: absolute; bottom: 0px; border: 0px; width: 100%; height:20px; padding-left: 6px; }
 			#userList { font-weight: bold; }
 			#userList li { margin: 4px; padding: 2px}
-			.timeStamp { width: 60px; display:inline-block}
-			.agent { display: inline-block; width: 80px; text-align: right; padding:0 6px; right; border-right: 1px solid  #ccc;}
-			.message { margin-left:6px; }
+			table { border-collapse: collapse; border: 0; }
+			tr { padding:0; margin:0; }
+			td { padding: 0 0.5em; min-width: 60px; margin:0}
+			.timeStamp {}
+			.agent { border-right: 1px solid  #ccc; text-align: right}
+			.message { }
 			.grey { color: #666 }
 			.green { color: green }
 			.red { color: #b00 }
@@ -27,15 +30,15 @@
 	<body>
 		<div id="container">
 			<div id="chatRoom">
-				<ul id="chatLines">
+				<table id="chatLines">
 					{{range .History}}
-						<li class="grey">
-							<span class="timeStamp">[{{timeFormat .TimeStamp}}]</span>
-							<span class="agent">{{.Author}}</span>
-							<span class="message">{{.Message}}</span>
-						</li>
+						<tr class="grey">
+							<td class="timeStamp">[{{timeFormat .TimeStamp}}]</td>
+							<td class="agent">{{.Author}}</td>
+							<td class="message">{{.Message}}</td>
+						</tr>
 					{{end}}
-				</ul>
+				</table>
 			</div>
 			<div id="usersBar">
 				<ul id="userList">
@@ -172,14 +175,14 @@
 					console.log("ws connected");
 				}
 				ws.onclose = function(e) {
-					var li = document.createElement("li");
-					if (li.classList) {
-						li.classList.add("red");
+					var tr = document.createElement("tr");
+					if (tr.classList) {
+						tr.classList.add("red");
 					} else {
-						li.className += " red";
+						tr.className += " red";
 					}
-					li.innerHTML = "ERROR: Server unavailable. Refresh page to retry";
-					lines.appendChild(li);
+					tr.innerHTML = "<td></td><td>**</td><td>ERROR: Server unavailable. Refresh page to retry</td>";
+					lines.appendChild(tr);
 					chatRoom.scrollTop = chatRoom.scrollHeight;
 					input.setAttribute("disabled", true);
 
@@ -193,20 +196,20 @@
 						activeTitle = line.Author + " says...";
 					}
 
-					var li = document.createElement("li");
+					var tr = document.createElement("tr");
 					if (line.Color != "") {
-						if (li.classList) {
-						li.classList.add(line.Color);
+						if (tr.classList) {
+						tr.classList.add(line.Color);
 					} else {
-						li.className += ' ' + line.Color;
+						tr.className += ' ' + line.Color;
 					}
 
 					}
-					var c = "<span class='timeStamp'>[" + parseTime(line.TimeStamp) + "]</span>" +
-													 "<span class='agent'>" + line.Author + "</span>" +
-													 "<span class='message'>" + linkify(line.Message) + "</span>";
-					li.innerHTML = c;
-					lines.appendChild(li);
+					var c = "<td class='timeStamp'>[" + parseTime(line.TimeStamp) + "]</td>" +
+													 "<td class='agent'>" + line.Author + "</td>" +
+													 "<td class='message'>" + linkify(line.Message) + "</td>";
+					tr.innerHTML = c;
+					lines.appendChild(tr);
 					// scroll to bottom
 					chatRoom.scrollTop = chatRoom.scrollHeight;
 
