@@ -253,8 +253,10 @@ func (h chatHub) run() {
 			l.Info("client disconnected", log.Ctx{"address": c.ws.RemoteAddr().String()})
 			nick := c.user.Nick
 			id := c.user.ID
-			delete(h.connections, c)
-			close(c.send)
+			if _, ok := h.connections; ok {
+				delete(h.connections, c)
+				close(c.send)
+			}
 			if nick != "" {
 				msg := chatLine{
 					Color:    "green",
