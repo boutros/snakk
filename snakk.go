@@ -417,18 +417,6 @@ func (h chatHub) run() {
 	}
 }
 
-// investigate crashes, possibly due to mod_proxy_wstunnel bug
-func panicRecover(f func(w http.ResponseWriter, r *http.Request)) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			if err := recover(); err != nil {
-				l.Error("recovering from panic", log.Ctx{"error": err, "stack": string(debug.Stack())})
-			}
-		}()
-		f(w, r)
-	}
-}
-
 func main() {
 	cfg, err := loadConfig("config.json")
 	if err != nil {
@@ -459,6 +447,14 @@ func main() {
 		log.LvlFilterHandler(level, log.Must.FileHandler(cfg.LogFile, log.LogfmtFormat())),
 		log.StreamHandler(os.Stdout, log.TerminalFormat())))
 
+	// investigate crashes, possibly due to mod_proxy_wstunnel bug
+	defer func() {
+		if err := recover(); err != nil {
+			l.Error("we're going down:(", log.Ctx{"error": err, "stack": string(debug.Stack())})
+			os.Exit(1)
+		}
+	}()
+
 	chatHistory = newFIFO(cfg.ChatHistoryNumLines)
 
 	h = newChatHub()
@@ -467,7 +463,7 @@ func main() {
 	// routing
 	http.HandleFunc("/", chatRoomHandler)
 	http.HandleFunc("/users", usersHandler)
-	http.HandleFunc("/ws", panicRecover(wsHandler))
+	http.HandleFunc("/ws", wsHandler)
 	http.HandleFunc("/.status", statusHandler)
 	http.HandleFunc("/favicon.ico", serveFile("data/irc.ico"))
 	http.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
