@@ -23,3 +23,4 @@ cover:
 clean:
 	@go clean
 	@rm -f *.out
+	rm deb/*.deb
