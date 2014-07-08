@@ -1,7 +1,7 @@
 package main
 
 // FIFO is queue of chatLines implemented as a ring buffer, so
-// that it always keep the latest >size> messages.
+// that it always keep the latest <size> messages.
 type FIFO struct {
 	items  []chatLine
 	oldest int  // oldest item in buffer
