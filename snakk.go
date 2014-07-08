@@ -403,16 +403,17 @@ func (h chatHub) run() {
 						Meta:    true,
 						Message: "Unknown command"}
 				}
-			} else {
+			} else { // not a command message
 				if um.c.user.Nick == "" {
 					um.c.send <- chatLine{
 						Color:   "red",
 						Author:  "**",
 						Meta:    true,
 						Message: "You must choose a nicname before you can join the chat."}
+				} else {
+					msg := chatLine{Message: string(m), Author: um.c.user.Nick}
+					h.broadcast <- msg
 				}
-				msg := chatLine{Message: string(m), Author: um.c.user.Nick}
-				h.broadcast <- msg
 			}
 
 		}
