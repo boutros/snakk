@@ -215,7 +215,7 @@ func cleanNick(s string) string {
 			break
 		}
 		if unicode.IsSpace(r) {
-			b.WriteString("_")
+			b.WriteRune('_')
 		} else {
 			b.WriteRune(r)
 		}
@@ -281,139 +281,142 @@ func (h chatHub) run() {
 			}
 		case um := <-h.incoming:
 			m := bytes.TrimSpace(um.msg)
-			if bytes.HasPrefix(m, []byte("/")) {
-				b := bytes.SplitN(m[1:len(m)], []byte(" "), 2)
-				cmd := bytes.ToLower(b[0])
-				rest := []byte("")
-				if len(b) > 1 {
-					rest = b[1]
-				}
-				if um.c.user.Nick == "" && string(cmd) != "nick" {
+			if !bytes.HasPrefix(m, []byte("/")) {
+				// not a command message
+				if um.c.user.Nick == "" {
 					um.c.send <- chatLine{
 						Color:   "red",
 						Author:  "**",
 						Meta:    true,
 						Message: "You must choose a nickname before you can join the chat."}
 					break
+				} else {
+					msg := chatLine{Message: string(m), Author: um.c.user.Nick}
+					h.broadcast <- msg
+					break
 				}
-				switch string(cmd) {
-				case "nick":
-					if len(rest) > 0 {
-						nick := cleanNick(string(rest))
-						nickTaken := false
-						for c := range h.connections {
-							if c.user.Nick == nick {
-								nickTaken = true
-								break
-							}
-						}
-						if nickTaken && um.c.user.Nick != nick {
-							um.c.send <- chatLine{
-								Color:   "red",
-								Author:  "**",
-								Meta:    true,
-								Message: "That nick is allready taken. Choose another one."}
-							break
-						}
-						oldNick := um.c.user.Nick
-						um.c.user.Nick = nick
-						um.c.send <- chatLine{
-							Color:      "green",
-							Author:     "**",
-							Meta:       true,
-							UserChange: um.c.user.ID,
-							UserNick:   um.c.user.Nick,
-							Message:    "You are now known as " + um.c.user.Nick}
-						msg := chatLine{
-							Color:    "green",
-							Author:   "*",
-							Meta:     true,
-							UserNick: um.c.user.Nick}
-						if oldNick != "" {
-							msg.UserChange = um.c.user.ID
-							msg.Message = fmt.Sprintf("%s is now known as %s", oldNick, nick)
-						} else {
-							msg.UserNew = um.c.user.ID
-							msg.Message = fmt.Sprintf("%s has joined the chat", nick)
-						}
-						for c := range h.connections {
-							if c == um.c {
-								continue
-							}
-							select {
-							case c.send <- msg:
-							default:
-								close(c.send)
-								delete(h.connections, c)
-							}
-						}
-						break
-					}
+
+			}
+			b := bytes.SplitN(m[1:len(m)], []byte(" "), 2)
+			cmd := bytes.ToLower(b[0])
+			rest := []byte("")
+			if len(b) > 1 {
+				rest = b[1]
+			}
+			if um.c.user.Nick == "" && string(cmd) != "nick" {
+				um.c.send <- chatLine{
+					Color:   "red",
+					Author:  "**",
+					Meta:    true,
+					Message: "You must choose a nickname before you can join the chat."}
+				break
+			}
+			switch string(cmd) {
+			case "nick":
+				if len(rest) == 0 {
 					um.c.send <- chatLine{
 						Color:   "red",
 						Author:  "**",
 						Meta:    true,
 						Message: "Your nickname cannot be empty."}
-				case "uptime":
+					break
+				}
+				nick := cleanNick(string(rest))
+				nickTaken := false
+				for c := range h.connections {
+					if c.user.Nick == nick {
+						nickTaken = true
+						break
+					}
+				}
+				if nickTaken && um.c.user.Nick != nick {
+					um.c.send <- chatLine{
+						Color:   "red",
+						Author:  "**",
+						Meta:    true,
+						Message: "That nick is allready taken. Choose another one."}
+					break
+				}
+				oldNick := um.c.user.Nick
+				um.c.user.Nick = nick
+				um.c.send <- chatLine{
+					Color:      "green",
+					Author:     "**",
+					Meta:       true,
+					UserChange: um.c.user.ID,
+					UserNick:   um.c.user.Nick,
+					Message:    "You are now known as " + um.c.user.Nick}
+				msg := chatLine{
+					Color:    "green",
+					Author:   "*",
+					Meta:     true,
+					UserNick: um.c.user.Nick}
+				if oldNick != "" {
+					msg.UserChange = um.c.user.ID
+					msg.Message = fmt.Sprintf("%s is now known as %s", oldNick, nick)
+				} else {
+					msg.UserNew = um.c.user.ID
+					msg.Message = fmt.Sprintf("%s has joined the chat", nick)
+				}
+				for c := range h.connections {
+					if c == um.c {
+						continue
+					}
+					select {
+					case c.send <- msg:
+					default:
+						close(c.send)
+						delete(h.connections, c)
+					}
+				}
+			case "uptime":
+				um.c.send <- chatLine{
+					Color:   "green",
+					Author:  "**",
+					Meta:    true,
+					Message: fmt.Sprintf("The server has been running for %s.", status.Export().UpTime)}
+			case "me":
+				msg := chatLine{
+					Color:   "green",
+					Meta:    true,
+					Author:  "*",
+					Message: fmt.Sprintf("%s %s", um.c.user.Nick, string(rest))}
+				h.broadcast <- msg
+			case "help":
+				if len(bytes.TrimSpace(rest)) == 0 {
 					um.c.send <- chatLine{
 						Color:   "green",
 						Author:  "**",
 						Meta:    true,
-						Message: fmt.Sprintf("The server has been running for %s.", status.Export().UpTime)}
-				case "me":
-					msg := chatLine{
-						Color:   "green",
-						Meta:    true,
-						Author:  "*",
-						Message: fmt.Sprintf("%s %s", um.c.user.Nick, string(rest))}
-					h.broadcast <- msg
-				case "help":
-					if len(bytes.TrimSpace(rest)) == 0 {
+						Message: "Available commands: nick, me, help, uptime. Type /help &lt;command&gt; for usage information."}
+					break
+				}
+				cleanedCmd := string(bytes.TrimSpace(rest))
+				validCmd := false
+				for _, c := range commands {
+					if cleanedCmd == c.Cmd {
 						um.c.send <- chatLine{
 							Color:   "green",
 							Author:  "**",
 							Meta:    true,
-							Message: "Available commands: nick, me, help, uptime. Type /help &lt;command&gt; for usage information."}
+							Message: c.Desc}
+						validCmd = true
 						break
 					}
-					cleanedCmd := string(bytes.TrimSpace(rest))
-					validCmd := false
-					for _, c := range commands {
-						if cleanedCmd == c.Cmd {
-							um.c.send <- chatLine{
-								Color:   "green",
-								Author:  "**",
-								Meta:    true,
-								Message: c.Desc}
-							validCmd = true
-							break
-						}
-					}
-					if !validCmd {
-						um.c.send <- chatLine{
-							Color:   "red",
-							Author:  "**",
-							Meta:    true,
-							Message: "Unknown command."}
-					}
-				default:
+				}
+				if !validCmd {
 					um.c.send <- chatLine{
 						Color:   "red",
 						Author:  "**",
 						Meta:    true,
-						Message: "Unknown command"}
+						Message: "Unknown command."}
 				}
-			} else { // not a command message
-				if um.c.user.Nick == "" {
-					um.c.send <- chatLine{
-						Color:   "red",
-						Author:  "**",
-						Meta:    true,
-						Message: "You must choose a nicname before you can join the chat."}
-				} else {
-					msg := chatLine{Message: string(m), Author: um.c.user.Nick}
-					h.broadcast <- msg
-				}
+			default:
+				um.c.send <- chatLine{
+					Color:   "red",
+					Author:  "**",
+					Meta:    true,
+					Message: "Unknown command"}
 			}
 
 		}
