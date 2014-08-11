@@ -1,8 +1,8 @@
 package main
 
-// FIFO is queue of chatLines implemented as a ring buffer, so
+// Stack is a FIFO stack of chatLines implemented as a ring buffer, so
 // that it always keep the latest <size> messages.
-type FIFO struct {
+type Stack struct {
 	items  []chatLine
 	oldest int  // oldest item in buffer
 	next   int  // next write mark
@@ -10,13 +10,13 @@ type FIFO struct {
 	full   bool // true when buffer is full
 }
 
-// newFIFO creates a new FIFO queue of max size chatlines.
-func newFIFO(size int) *FIFO {
-	return &FIFO{items: make([]chatLine, size)}
+// newStack creates a new Stack queue of max size chatlines.
+func newStack(size int) *Stack {
+	return &Stack{items: make([]chatLine, size)}
 }
 
 // Push an chatline intem to the queue.
-func (q *FIFO) Push(l chatLine) {
+func (q *Stack) Push(l chatLine) {
 	// assign item
 	q.items[q.next] = l
 
@@ -47,7 +47,7 @@ func (q *FIFO) Push(l chatLine) {
 }
 
 // All returns all chatLine items, in cronological order.
-func (q *FIFO) All() []chatLine {
+func (q *Stack) All() []chatLine {
 	all := make([]chatLine, q.size)
 
 	if q.next >= q.next && !q.full {

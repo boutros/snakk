@@ -45,7 +45,7 @@ type userMsg struct {
 }
 
 var (
-	chatHistory *FIFO
+	chatHistory *Stack
 	nextID      int
 	h           chatHub
 	cfg         *Config
@@ -458,7 +458,7 @@ func main() {
 		}
 	}()
 
-	chatHistory = newFIFO(cfg.ChatHistoryNumLines)
+	chatHistory = newStack(cfg.ChatHistoryNumLines)
 
 	h = newChatHub()
 	go h.run()

@@ -2,8 +2,8 @@ package main
 
 import "testing"
 
-func TestFIFO(t *testing.T) {
-	q := newFIFO(3)
+func TestStack(t *testing.T) {
+	q := newStack(3)
 
 	a := chatLine{Message: "a"}
 	b := chatLine{Message: "b"}
@@ -14,7 +14,7 @@ func TestFIFO(t *testing.T) {
 	g := chatLine{Message: "g"}
 
 	if len(q.items) != 3 {
-		t.Errorf("len(newFIFO(3)) => %d; want 3", len(q.items))
+		t.Errorf("len(newStack(3)) => %d; want 3", len(q.items))
 	}
 
 	if q.size != 0 {
